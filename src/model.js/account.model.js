@@ -30,7 +30,7 @@ accountSchema.methods.getbalance=async function()
 {
     const balance_data=await ledgermodel.aggregate([
         {
-            $match:{account:this_.id},
+            $match:{account:this._id},
             $group:{
                 __id:null,
                 totaldebit:

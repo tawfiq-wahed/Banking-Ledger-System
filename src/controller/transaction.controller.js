@@ -3,7 +3,7 @@ const accountmodel=require("../model.js/account.model.js");
 const ledgermodel=require("../model.js/ledger.model.js");
 const mailservice=require("../service/mail.service.js");
 const mongoose=require("mongoose")
-async function createTransaction()
+async function createTransaction(req,res)
 {
     const {fromAccount,toAccount,ammount,idempotencyKey}=req.body
     if(!fromAccount||!toAccount||!ammount||!idempotencyKey)
@@ -35,6 +35,7 @@ async function createTransaction()
 const isidempotencykeyalreadyexist=await transactionmodel.findOne({
     idempotencyKey:idempotencyKey
 })
+if (isidempotencykeyalreadyexist) {
     if(isidempotencykeyalreadyexist.status=="completed")
     {
         return res(200).json({
@@ -60,6 +61,7 @@ const isidempotencykeyalreadyexist=await transactionmodel.findOne({
             message:"transaction is reversed,please retry"
         })
     }
+}
     /**
      * check account status
      */
@@ -75,7 +77,7 @@ const isidempotencykeyalreadyexist=await transactionmodel.findOne({
     const balance=await fromuserAccount.getbalance()
     if(balance<ammount)
     {
-        res.staus(400).json({
+        res.status(400).json({
         message:`insufficient balance ,current balance is ${balance},requesting ammount:{ammount} `
         })
     }
@@ -107,7 +109,7 @@ const isidempotencykeyalreadyexist=await transactionmodel.findOne({
             account:touserAccount,
             ammount:ammount,
             transaction:transaction._id,
-            type:"DEBIT"
+            type:"CREDIT"
         },{session}
     )
     transaction.status="completed",
@@ -125,5 +127,70 @@ const isidempotencykeyalreadyexist=await transactionmodel.findOne({
         })
     }
 } 
-
-module.exports={createTransaction};
+async function createInitialFundingTransaction(req,res)
+{
+ const {toAccount,ammount,idempotencyKey}=req.body
+  if(!toAccount||!ammount||!idempotencyKey)
+  {
+     return res.status(400).json({
+          message:"bad request"
+      })
+  }
+  const touserAccount=await accountmodel.findOne({
+    _id:toAccount
+  })
+  if(!touserAccount)
+  {
+    return res.status(400).json({
+        message:"bad request with toAccount"
+    })
+  }
+  const fromuserAccount=await accountmodel.findOne({
+   // SystemUser:true,
+    user:req.user._id
+  })
+  if(!fromuserAccount)
+  {
+    return res.status(400).json({
+        message:"bad request with fromAccount"
+    })
+  }
+  const session=await mongoose.startSession()
+  session.startTransaction()
+  const transaction=new transactionmodel(
+    {
+      fromAccount: fromuserAccount._id,
+      toAccount: touserAccount._id,
+      ammount,
+      idempotencyKey,
+      status:"pending"
+    }
+  )
+  const debitledgerentry=await ledgermodel.create([
+    {
+      account:fromuserAccount._id,
+      ammount:ammount,
+      transaction:transaction._id,
+      type:"DEBIT"
+    }],
+    {session}
+  )
+  const creditledgerentry=await ledgermodel.create(
+    [{
+      account:touserAccount._id,
+      ammount:ammount,
+      transaction:transaction._id,
+      type:"CREDIT"
+    }],
+    {session}
+  )
+  transaction.status="completed"
+  await transaction.save({session})
+  await session.commitTransaction()
+  session.endSession()
+  return res.status(200).json({
+    message:" initial transaction completed successfully",
+    transaction:transaction
+  })
+}  
+module.exports={createTransaction, createInitialFundingTransaction};

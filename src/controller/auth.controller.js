@@ -39,7 +39,7 @@ async function login(req,res)
    if(!user)
    {
     return res.status(401).json({
-        message:"password is invalid"
+        message:"password or email is invalid"
     })
    }
    const ValidPassword=await user.comparePassword(password)

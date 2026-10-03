@@ -30,40 +30,48 @@ accountSchema.methods.getbalance=async function()
 {
     const balance_data=await ledgermodel.aggregate([
         {
-            $match:{account:this._id},
-            $group:{
-                __id:null,
+            
+                $match:{account:this._id}
+        },
+            {
+                $group:{
+                _id:null,
                 totaldebit:
                 {
                     $sum:{
                    $cond:
                   [ {
                     $eq:["$type","DEBIT"]},
-                    $ammount,
+                    "$ammount",
                     0
                    ]
                 }
-                },
+                }
+            
+        ,
                 totalcredit:
                 {
                     $sum:{
                    $cond:
                   [ {
                     $eq:["$type","CREDIT"]},
-                    $ammount,
+                    "$ammount",
                     0
                    ]
                 }
-                },
-            $project:{
+                }
+            }
+        },
+            {$project:{
                 _id:0,
                 balance:{
-                    $subtract:["$totaldebit","$totalcredit"]
+                  $subtract: ["$totalcredit", "$totaldebit"]
                 }
             }
 
-            }
+            
         }
+    
     ])
     if(balance_data.length===0)return 0
     return balance_data[0].balance

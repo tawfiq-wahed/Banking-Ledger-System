@@ -1,6 +1,8 @@
 const usermodel=require("../model.js/user.model.js")
 const jwt = require("jsonwebtoken");
 const emaillservice=require("../service/mail.service.js")
+const bcrypt=require("bcryptjs")
+const tokenblacklistmodel=require("../model.js/blacklist.model.js")
  async function UserRegister(req,res)
 {
    const {name,email,password}=req.body
@@ -27,6 +29,7 @@ const emaillservice=require("../service/mail.service.js")
         name:user.name
     }
    })
+   await emaillservice.register(user.email,user.name)
 }
 async function login(req,res)
 {
@@ -61,7 +64,32 @@ async function login(req,res)
     }
 
 })
-await emaillservice.register(user.email,user.name)
-}
 
-module.exports={UserRegister,login};
+}
+/**
+ * USER LOGOUT
+ */
+async function logout(req,res)
+{
+     const token=req.cookies.jwt_token||req.headers.authorization?.split(" ")[1]
+     if(!token)
+     {
+        return res.status(200).json({
+            message:"user logout successfully"
+        })
+     }
+       const istokenblacklisted = await tokenblacklistmodel.findOne({
+        token: token
+    });
+    if (!istokenblacklisted) {
+     await tokenblacklistmodel.create({
+        token:token
+     })
+    }
+     res.clearCookie("jwt_token")
+     res.status(200).json({
+        message:"user logout successfully"
+     })
+     
+}
+module.exports={UserRegister,login,logout};

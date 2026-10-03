@@ -7,4 +7,5 @@ const authcontroller=require("../controller/auth.controller");
  */
 router.post("/register",authcontroller.UserRegister)
 router.post("/login",authcontroller.login)
+router.post("/logout",authcontroller.logout)
 module.exports=router
